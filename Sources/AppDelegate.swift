@@ -54,7 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         timer = t
         tick()
 
-        if CommandLine.arguments.contains("--demo") {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--tool"), i + 1 < args.count, let tool = Tool(rawValue: args[i + 1]) {
+            trips.show(tool)
+        } else if args.contains("--demo") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.preview(.ten) }
         } else if store.trips.isEmpty || CommandLine.arguments.contains("--trips") {
             trips.show()
@@ -169,6 +172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Open IRCTC", #selector(openIRCTC), key: "o"))
         menu.addItem(item("Check a PNR on Indian Railways", #selector(openPNRPage)))
         menu.addItem(item("Train running status (NTES)", #selector(openNTES)))
+        let tools = NSMenu()
+        for tool in Tool.allCases {
+            let mi = item(tool.title, #selector(showTool(_:)))
+            mi.representedObject = tool.rawValue
+            mi.image = NSImage(systemSymbolName: tool.symbol, accessibilityDescription: nil)
+            tools.addItem(mi)
+        }
+        menu.addItem(submenu("Rail tools", tools))
 
         menu.addItem(.separator())
         let preview = NSMenu()
@@ -258,6 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showTrip(_ sender: NSMenuItem) { trips.show(sender.representedObject as? UUID) }
     @objc private func showTrips() { trips.show() }
     @objc private func newTrip() { trips.newTrip() }
+    @objc private func showTool(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let tool = Tool(rawValue: raw) { trips.show(tool) }
+    }
     @objc private func openIRCTC() { NSWorkspace.shared.open(Rules.bookingURL) }
     @objc private func openPNRPage() { openPNR(nil) }
     @objc private func openNTES() { NSWorkspace.shared.open(Rules.ntesURL) }

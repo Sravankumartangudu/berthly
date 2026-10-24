@@ -53,6 +53,8 @@ struct Trip: Codable, Identifiable, Equatable {
     var fired: Set<String> = []
     var pnr = ""
     var pnrStatus = ""
+    /// Ticket fare for all passengers, in rupees, without IRCTC's convenience fee. Used for the refund estimate.
+    var fare: Double?
     /// Fixed times for the ✨ preview cards, which use a made-up trip that is never saved.
     var previewOpens: Date?
     var previewChart: Date?
@@ -80,6 +82,7 @@ struct Trip: Codable, Identifiable, Equatable {
         fired = try c.decodeIfPresent(Set<String>.self, forKey: .fired) ?? d.fired
         pnr = try c.decodeIfPresent(String.self, forKey: .pnr) ?? d.pnr
         pnrStatus = try c.decodeIfPresent(String.self, forKey: .pnrStatus) ?? d.pnrStatus
+        fare = try c.decodeIfPresent(Double.self, forKey: .fare)
     }
 
     var trainStarts: Date { Rules.calendar.date(byAdding: .day, value: startDayOffset, to: Rules.day(journeyDate))! }

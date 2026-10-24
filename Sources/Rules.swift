@@ -22,6 +22,10 @@ enum Rules {
     /// IRCTC-authorised agents can't book Tatkal in the first 30 minutes.
     static let agentBlockMinutes = 30
 
+    /// Most passengers on one ticket (PNR).
+    static let generalPassengers = 6
+    static let tatkalPassengers = 4
+
     /// Booking links. The app only opens these pages; you sign in, fill and pay on IRCTC yourself.
     static let bookingURL = URL(string: "https://www.irctc.co.in/nget/train-search")!
     static let pnrURL = URL(string: "https://www.indianrail.gov.in/enquiry/PNR/PnrEnquiry.html?locale=en")!
@@ -60,11 +64,14 @@ enum Rules {
 }
 
 enum TravelClass: String, Codable, CaseIterable, Identifiable {
-    case ac2 = "2A", ac3 = "3A", ac3e = "3E", cc = "CC", ec = "EC", sl = "SL", second = "2S"
+    case ac1 = "1A", ac2 = "2A", ac3 = "3A", ac3e = "3E", cc = "CC", ec = "EC", sl = "SL", second = "2S"
     var id: String { rawValue }
     var isAC: Bool { ![.sl, .second].contains(self) }
+    /// There's no Tatkal or Premium Tatkal quota in AC First Class.
+    var hasTatkal: Bool { self != .ac1 }
     var label: String {
         switch self {
+        case .ac1: return "1A · AC First Class"
         case .ac2: return "2A · AC 2-tier"
         case .ac3: return "3A · AC 3-tier"
         case .ac3e: return "3E · AC 3 economy"

@@ -6,18 +6,37 @@ final class TripsWindow {
     let selection = Selection()
 
     final class Selection: ObservableObject {
-        @Published var id: UUID?
+        @Published var page: Page?
         @Published var now = Date()
+    }
+
+    /// What the window shows on the right: a trip or one of the tools.
+    enum Page: Hashable {
+        case trip(UUID)
+        case tool(Tool)
     }
 
     func show(_ id: UUID? = nil) {
         // Start on the trip that opens soonest rather than an empty page.
         let store = Store.shared
         if let id {
-            selection.id = id
-        } else if selection.id.map({ id in !store.trips.contains { $0.id == id } }) ?? true {
-            selection.id = (store.upcoming(now: selection.now).first ?? store.trips.first)?.id
+            selection.page = .trip(id)
+        } else if case .trip(let shown)? = selection.page, store.trips.contains(where: { $0.id == shown }) {
+            // Keep the trip that's already showing.
+        } else if case .tool? = selection.page {
+            // Keep the tool that's already showing.
+        } else {
+            selection.page = (store.upcoming(now: selection.now).first ?? store.trips.first).map { .trip($0.id) }
         }
+        present()
+    }
+
+    func show(_ tool: Tool) {
+        selection.page = .tool(tool)
+        present()
+    }
+
+    private func present() {
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -54,35 +73,44 @@ struct TripsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selection.id) {
+            List(selection: $selection.page) {
                 Section("Trips") {
                     ForEach(store.trips.sorted { $0.opens < $1.opens }) { t in
-                        TripRow(trip: t, now: selection.now).tag(t.id)
+                        TripRow(trip: t, now: selection.now).tag(TripsWindow.Page.trip(t.id))
+                    }
+                    if store.trips.isEmpty {
+                        Text("No trips yet").foregroundStyle(.secondary).selectionDisabled()
+                    }
+                }
+                Section("Tools") {
+                    ForEach(Tool.allCases) { tool in
+                        Label(tool.title, systemImage: tool.symbol).tag(TripsWindow.Page.tool(tool))
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    let t = Trip()
-                    store.trips.append(t)
-                    selection.id = t.id
-                } label: { Label("New trip", systemImage: "plus") }
+                Button { add(Trip()) } label: { Label("New trip", systemImage: "plus") }
                 .buttonStyle(.borderless).padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 270)
         } detail: {
-            if let id = selection.id, store.trips.contains(where: { $0.id == id }) {
-                TripDetail(id: id, now: selection.now).id(id)
-            } else {
-                Welcome(now: selection.now) {
-                    let t = Trip()
-                    store.trips.append(t)
-                    selection.id = t.id
-                }
+            switch selection.page {
+            case .trip(let id)? where store.trips.contains(where: { $0.id == id }):
+                TripDetail(id: id, now: selection.now) { selection.page = .tool($0) }.id(id)
+            case .tool(let tool)?:
+                ToolPage(tool: tool, now: selection.now, add: add).id(tool)
+            default:
+                Welcome(now: selection.now) { add(Trip()) }
             }
         }
         .environment(\.timeZone, Rules.ist)
+    }
+
+    /// Saves a new trip (blank, or started from a tool) and shows it.
+    private func add(_ t: Trip) {
+        store.trips.append(t)
+        selection.page = .trip(t.id)
     }
 }
 
@@ -171,6 +199,7 @@ struct RulesCard: View {
 struct TripDetail: View {
     let id: UUID
     let now: Date
+    let openTool: (Tool) -> Void
     @EnvironmentObject var store: Store
     @State private var advice: String?
     @State private var thinking = false
@@ -188,7 +217,9 @@ struct TripDetail: View {
 
             Section("Journey") {
                 TextField("From", text: trip.from, prompt: Text("Station code or name, e.g. NDLS"))
+                StationSuggestions(text: trip.from)
                 TextField("To", text: trip.to, prompt: Text("e.g. MMCT"))
+                StationSuggestions(text: trip.to)
                 TextField("Train number", text: trip.trainNumber, prompt: Text("e.g. 12952"))
                 TextField("Train name", text: trip.trainName, prompt: Text("Optional"))
                 DatePicker("Boarding date", selection: Binding(get: { t.journeyDate },
@@ -222,8 +253,10 @@ struct TripDetail: View {
                 Picker("Class", selection: trip.travelClass) {
                     ForEach(TravelClass.allCases) { Text($0.label).tag($0) }
                 }
-                Stepper("Passengers: \(t.passengers)", value: trip.passengers, in: 1...(t.quota == .general ? 6 : 4))
-                    .help("IRCTC allows up to 4 passengers on a Tatkal ticket and 6 on a general one.")
+                quotaNote(t)
+                Stepper("Passengers: \(t.passengers)", value: trip.passengers,
+                        in: 1...(t.quota == .general ? Rules.generalPassengers : Rules.tatkalPassengers))
+                    .help("IRCTC allows up to \(Rules.tatkalPassengers) passengers on a Tatkal ticket and \(Rules.generalPassengers) on a general one.")
                 TextField("Backup (another train, class or station)", text: trip.backup)
                 TextField("Notes", text: trip.notes, prompt: Text("No passwords, OTPs or Aadhaar numbers"), axis: .vertical).lineLimit(2...5)
             }
@@ -245,6 +278,9 @@ struct TripDetail: View {
             Section("After booking") {
                 TextField("PNR (10 digits)", text: trip.pnr)
                 TextField("Status, e.g. CNF B2 34, RAC 5, WL 12", text: trip.pnrStatus)
+                TextField("Fare paid (₹, all passengers)", value: trip.fare, format: .number,
+                          prompt: Text("Optional, for the refund estimate"))
+                if t.booked { refundLine(t) }
                 if let chart = t.chart {
                     LabeledContent("Chart expected", value: DateFormatter.ist("EEE d MMM, HH:mm").string(from: chart) + " IST")
                 } else {
@@ -277,6 +313,8 @@ struct TripDetail: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(t.details, forType: .string)
                     }
+                    Button("Add to Calendar") { CalendarExport.open(t, now: now) }
+                        .help("Adds the booking opening, the journey and the chart time to Calendar, with reminders. The PNR isn't included.")
                     Spacer()
                     Button("Delete trip", role: .destructive) { confirmDelete = true }
                 }
@@ -318,6 +356,38 @@ struct TripDetail: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder private func quotaNote(_ t: Trip) -> some View {
+        if t.quota != .general && !t.travelClass.hasTatkal {
+            Label("There's no \(t.quota.rawValue) in 1A. Pick General, or another class.", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange).font(.callout)
+        } else if t.quota == .tatkal, let ch = Refunds.tatkalCharge(t.travelClass) {
+            Text("Tatkal charge: \(Int(ch.percent * 100))% of the basic fare, ₹\(Int(ch.min))–₹\(Int(ch.max)) per passenger. A confirmed Tatkal ticket isn't refunded if you cancel.")
+                .font(.caption).foregroundStyle(.secondary)
+        } else if t.quota == .premium {
+            Text("Premium Tatkal fares rise as seats sell, and a confirmed ticket isn't refunded if you cancel.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// What cancelling right now would give back, from the fare and the status typed in.
+    @ViewBuilder private func refundLine(_ t: Trip) -> some View {
+        let status = TicketStatus.parse(t.pnrStatus)
+        let dep = t.departure ?? Rules.at(0, on: t.journeyDate)
+        let q = Refunds.quote(fare: t.fare ?? 0, passengers: t.passengers, travelClass: t.travelClass, quota: t.quota,
+                              status: status ?? .confirmed, departure: dep, at: now)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t.fare == nil ? "If you cancel now" : "If you cancel now: about ₹\(Int(q.refund.rounded())) back")
+                    .font(.callout.weight(.medium))
+                Text(q.rule + (status == nil ? " (Read as confirmed; type the status above to change that.)" : "")
+                     + (t.departure == nil ? " Add the departure time for an exact slab." : ""))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Refund calculator") { openTool(.refund) }
+        }
     }
 
     private func openPNR(_ t: Trip) {

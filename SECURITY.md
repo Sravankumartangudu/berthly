@@ -16,7 +16,8 @@ Only the latest release gets fixes. Update from the
 ## What Berthly handles
 
 - **Stored on your Mac:** trips in `~/Library/Application Support/Berthly/trips.json`, in a folder
-  only your user account can read.
+  only your user account can read. **Add to Calendar** writes a short-lived `.ics` file (no PNR) in a
+  private temporary folder and deletes it five minutes later.
 - **Sent over the network:** time-server queries (no personal data), and, only when you click the
   ✨ coach, the trip details without the PNR, through your own `claude` command-line tool.
 - **Never handled:** IRCTC passwords, OTPs, Aadhaar numbers, passenger identity details or payment

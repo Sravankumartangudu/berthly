@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.0 — 2026-10-24
+
+🧰 Rail tools: everything else you need around an IRCTC booking, worked out on your Mac.
+
+- **Festival planner**: festivals and holidays through 2027 (Diwali, Chhath, Holi, Eid, Pongal,
+  Onam, Durga Puja, summer holidays and more). Shows the morning general booking opens for the
+  day you'd travel, with a countdown, and the Tatkal day. **Plan** makes it a trip.
+- **Refund calculator**: what a cancellation gives back by class, quota, status, fare and time,
+  under the 2015 refund rules with the April 2026 slabs (72/24/8 h). Booked trips get a fare field
+  and an "If you cancel now" line.
+- **Tatkal charges**: the charge per class and a calculator.
+- **Station codes**: 8,953 stations searchable offline (datameet, CC0), with renamed stations
+  (ALD → PRYJ, MGS → DDU, HBJ → RKMP and more). Station names appear as you type From and To,
+  and an old code offers the new one.
+- **On the journey**: Rail Madad, e-Catering, retiring rooms, NTES, PNR status, 139, and a TDR
+  guide.
+- **Good to know**: VIKALP, auto-upgrade, lower berths, the senior concession, passengers per
+  ticket, Aadhaar for Tatkal, ID on board.
+- **Add to Calendar**: opening, journey and chart events with alerts. The PNR is never included.
+- 1A added as a class, with a warning that it has no Tatkal quota. The passengers stepper follows
+  the 4 (Tatkal) and 6 (general) limits.
+- Menu → **Rail tools** opens any tool.
+
 ## 1.0.0 — 2026-10-24
 
 First release.
